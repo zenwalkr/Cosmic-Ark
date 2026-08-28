@@ -1,0 +1,66 @@
+# Cosmic Ark 2.5D - original low-poly materials
+newmtl ark_crimson
+Ka 0.18 0.02 0.03
+Kd 0.92 0.08 0.11
+Ks 0.42 0.18 0.12
+Ns 28
+
+newmtl ark_gold
+Ka 0.18 0.09 0.01
+Kd 1.00 0.48 0.04
+Ks 0.55 0.30 0.08
+Ns 36
+
+newmtl window_blue
+Ka 0.00 0.08 0.15
+Kd 0.02 0.62 0.92
+Ks 0.65 0.92 1.00
+Ns 82
+
+newmtl engine_dark
+Ka 0.02 0.02 0.04
+Kd 0.08 0.09 0.14
+Ks 0.18 0.20 0.28
+Ns 18
+
+newmtl shuttle_violet
+Ka 0.06 0.02 0.16
+Kd 0.42 0.12 0.88
+Ks 0.50 0.35 0.92
+Ns 54
+
+newmtl beam_cyan
+Ka 0.00 0.15 0.16
+Kd 0.00 0.90 0.88
+Ks 0.60 1.00 1.00
+Ns 92
+
+newmtl meteor_rock
+Ka 0.10 0.04 0.02
+Kd 0.44 0.19 0.08
+Ks 0.10 0.07 0.04
+Ns 8
+
+newmtl meteor_glow
+Ka 0.18 0.04 0.00
+Kd 0.98 0.25 0.02
+Ks 0.55 0.15 0.02
+Ns 24
+
+newmtl creature_lime
+Ka 0.07 0.18 0.01
+Kd 0.43 0.98 0.04
+Ks 0.30 0.55 0.08
+Ns 22
+
+newmtl creature_yellow
+Ka 0.20 0.15 0.00
+Kd 1.00 0.82 0.04
+Ks 0.58 0.42 0.05
+Ns 30
+
+newmtl turret_magenta
+Ka 0.16 0.01 0.10
+Kd 0.88 0.04 0.52
+Ks 0.62 0.16 0.42
+Ns 42
