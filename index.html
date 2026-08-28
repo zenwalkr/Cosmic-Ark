@@ -1,0 +1,1241 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+    <meta name="theme-color" content="#05020f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="preload" href="./cosmicark-assets.mtl" as="fetch" crossorigin="anonymous">
+    <link rel="preload" href="./ark.obj" as="fetch" crossorigin="anonymous">
+    <link rel="preload" href="./shuttle.obj" as="fetch" crossorigin="anonymous">
+    <title>Cosmic Ark: Alpha Ro Rescue</title>
+    <style>
+        :root {
+            --space:#05020f;
+            --panel:rgba(12,5,31,.95);
+            --ink:#fff9de;
+            --amber:#ffb20c;
+            --orange:#ff5a17;
+            --magenta:#ff2e88;
+            --violet:#8d4bff;
+            --cyan:#16f2dd;
+            --lime:#a8ff19;
+            --muted:#aaa0c8;
+        }
+        * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+        *:not(input):not(textarea) { user-select:none; -webkit-user-select:none; }
+        html,body {
+            width:100%; height:100%; height:100dvh; overflow:hidden; overscroll-behavior:none; background:#020108; color:var(--ink);
+            font-family:"Courier New",ui-monospace,monospace; touch-action:none;
+        }
+        button,input,select { font:inherit; }
+        button,input,select,label { touch-action:manipulation; }
+        #stage {
+            position:fixed; left:50%; top:50%; width:1280px; height:720px; overflow:hidden;
+            transform:translate(-50%,-50%); transform-origin:center; background:var(--space);
+            box-shadow:0 0 100px #000;
+        }
+        #game { position:absolute; inset:0; width:1280px; height:720px; display:block; background:#05020f; }
+        #scanlines {
+            position:absolute; inset:0; z-index:5; pointer-events:none;
+            background:linear-gradient(rgba(255,255,255,.025) 50%,rgba(0,0,0,.075) 50%); background-size:100% 4px;
+            box-shadow:inset 0 0 130px rgba(0,0,0,.72); mix-blend-mode:overlay;
+        }
+        #hud { position:absolute; inset:0; z-index:10; display:none; pointer-events:none; text-shadow:2px 2px #180520; }
+        #hud.visible { display:block; }
+        .hud-box {
+            position:absolute; top:20px; min-width:235px; padding:10px 15px;
+            background:rgba(8,3,24,.78); border:2px solid var(--amber);
+            clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));
+        }
+        #hud-left { left:22px; }
+        #hud-right { right:22px; text-align:right; }
+        .hud-label { color:var(--amber); letter-spacing:3px; font-size:12px; }
+        .hud-value { margin-top:3px; font-size:24px; font-weight:bold; }
+        #mission-chip {
+            position:absolute; left:50%; top:20px; transform:translateX(-50%); padding:9px 20px;
+            border:2px solid var(--magenta); background:rgba(8,3,24,.8); color:#ff9bc8; letter-spacing:2px; font-size:13px;
+        }
+        #fuel-shell { position:absolute; left:50%; bottom:24px; width:330px; height:18px; transform:translateX(-50%); border:2px solid #fff; background:#150414; }
+        #fuel-bar { width:100%; height:100%; background:linear-gradient(90deg,#ff2b37,var(--orange),var(--amber),var(--lime)); transition:width .12s; }
+        #fuel-label { position:absolute; left:50%; bottom:48px; transform:translateX(-50%); font-size:12px; color:var(--amber); letter-spacing:4px; }
+        #phase-message {
+            position:absolute; left:50%; top:48%; transform:translate(-50%,-50%); text-align:center;
+            font-size:64px; font-weight:900; font-style:italic; letter-spacing:-2px; color:#fff;
+            filter:drop-shadow(6px 6px 0 #40104c) drop-shadow(0 0 16px var(--magenta));
+        }
+        #phase-message small { display:block; margin-top:14px; color:var(--cyan); font-size:16px; font-style:normal; letter-spacing:5px; }
+        #warning { position:absolute; left:50%; top:105px; transform:translateX(-50%); display:none; color:#ff334f; font-size:22px; font-weight:bold; letter-spacing:5px; animation:blink .45s steps(1) infinite; }
+        @keyframes blink { 50% { opacity:.2; } }
+        #crew-strip {
+            position:absolute; left:20px; bottom:22px; max-width:285px; padding:8px 11px; border-left:4px solid var(--cyan);
+            background:rgba(5,2,20,.76); color:var(--cyan); font-size:12px; letter-spacing:1px;
+        }
+        #menu-button { position:absolute; z-index:18; display:none; right:24px; bottom:22px; width:50px; height:42px; border:2px solid var(--cyan); color:#fff; background:#0a061dca; font-size:22px; cursor:pointer; }
+        #menu-button.visible { display:block; }
+        #overlay {
+            position:absolute; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; padding:26px; overflow:auto;
+            background:radial-gradient(circle at 50% 35%,rgba(141,75,255,.14),transparent 42%),linear-gradient(rgba(2,1,8,.12),rgba(2,1,8,.84));
+            backdrop-filter:blur(3px); touch-action:pan-y;
+        }
+        #overlay.hidden { display:none; }
+        .screen { display:none; width:min(1120px,100%); max-height:670px; overflow:auto; scrollbar-color:var(--violet) #120728; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y; }
+        .screen.active { display:block; }
+        .panel {
+            position:relative; padding:28px; border:2px solid var(--amber); border-radius:4px; background:var(--panel);
+            box-shadow:0 0 60px rgba(255,90,23,.13),inset 0 0 50px rgba(141,75,255,.08);
+        }
+        .panel::before,.panel::after { content:""; position:absolute; top:-5px; width:78px; height:8px; background:var(--magenta); box-shadow:0 0 18px var(--magenta); }
+        .panel::before { left:32px; } .panel::after { right:32px; }
+        .brand { text-align:center; margin-bottom:20px; }
+        .brand-kicker { color:var(--amber); font-size:13px; letter-spacing:7px; }
+        h1 { margin:4px 0 2px; color:#fff; font-size:72px; line-height:.95; text-transform:uppercase; letter-spacing:-5px; text-shadow:5px 5px 0 #521044,0 0 24px rgba(255,46,136,.44); }
+        .tagline { color:var(--cyan); font-size:14px; letter-spacing:5px; }
+        h2 { font-size:28px; text-transform:uppercase; letter-spacing:1px; }
+        h3 { margin-bottom:13px; color:var(--amber); font-size:14px; letter-spacing:3px; }
+        .eyebrow { color:var(--magenta); font-size:12px; letter-spacing:4px; }
+        .screen-head { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:20px; }
+        .identity { display:flex; align-items:center; gap:18px; margin:15px 0 18px; padding:12px 15px; border:1px solid #4e376c; background:#0b061c; }
+        .identity label { color:var(--amber); font-size:12px; letter-spacing:2px; white-space:nowrap; }
+        .identity span { color:var(--muted); font-size:11px; }
+        .input,select {
+            width:100%; min-height:43px; padding:10px 12px; border:2px solid #6a4a8c; outline:none; background:#080316; color:#fff;
+        }
+        .input:focus,select:focus { border-color:var(--cyan); box-shadow:0 0 12px rgba(22,242,221,.2); }
+        #nickname { max-width:220px; }
+        .mode-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+        .mode-card { min-height:175px; padding:20px; border:2px solid #62417b; background:linear-gradient(135deg,#15072b,#080318); color:#fff; text-align:left; cursor:pointer; transition:.16s; }
+        .mode-card:hover,.mode-card:focus { transform:translateY(-3px); border-color:var(--amber); box-shadow:0 0 22px rgba(255,178,12,.18); }
+        .mode-no { float:right; color:#513268; font-size:54px; font-weight:bold; line-height:.8; }
+        .mode-title { display:block; color:var(--amber); font-size:22px; letter-spacing:2px; }
+        .mode-title b { color:#fff; }
+        .mode-copy { display:block; max-width:430px; margin:16px 0; color:var(--muted); font-size:13px; line-height:1.45; }
+        .mode-cta { color:var(--cyan); font-size:12px; letter-spacing:2px; }
+        .footer-help { margin-top:16px; text-align:center; color:var(--muted); font-size:11px; line-height:1.5; }
+        .footer-help b { color:var(--amber); }
+        .mobile-help { display:none; }
+        .subpanel { padding:18px; border:1px solid #4b3266; background:#090419; }
+        .form-grid,.lobby-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+        .field { display:grid; gap:6px; margin-bottom:12px; }
+        .field label { color:var(--muted); font-size:11px; letter-spacing:2px; }
+        .inline-fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .checkline { display:flex; align-items:center; gap:9px; margin:8px 0 14px; color:var(--muted); font-size:12px; }
+        .checkline input { accent-color:var(--magenta); width:18px; height:18px; }
+        .btn { min-height:43px; padding:10px 17px; border:2px solid var(--cyan); background:#101038; color:#fff; font-weight:bold; letter-spacing:1px; cursor:pointer; }
+        .btn:hover,.btn:focus { filter:brightness(1.22); box-shadow:0 0 14px rgba(22,242,221,.24); }
+        .btn:disabled { opacity:.45; cursor:not-allowed; }
+        .btn.pink { border-color:var(--magenta); background:#551039; }
+        .btn.yellow { border-color:var(--amber); color:#1b0b00; background:var(--amber); }
+        .btn.ghost { background:transparent; border-color:#74578d; color:var(--muted); }
+        .btn.small { min-height:34px; padding:7px 12px; font-size:11px; }
+        .btn.block { width:100%; }
+        .rules { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:16px 0; }
+        .rule { padding:14px; border-top:3px solid var(--violet); background:#0a051b; color:var(--muted); font-size:12px; line-height:1.45; }
+        .rule b { display:block; margin-bottom:5px; color:#fff; }
+        .rule em { color:var(--cyan); font-style:normal; }
+        #rooms { max-height:185px; overflow:auto; border:1px solid #4b3266; }
+        .room-row { display:grid; grid-template-columns:1.6fr .7fr .8fr auto; align-items:center; gap:12px; padding:11px 13px; border-bottom:1px solid #332346; font-size:12px; }
+        .room-row:last-child { border:0; }
+        .status { color:var(--lime); text-transform:uppercase; }
+        .empty { padding:22px; text-align:center; color:var(--muted); font-size:12px; }
+        .room-code { text-align:center; color:var(--amber); font-size:52px; font-weight:bold; letter-spacing:12px; }
+        .room-name { margin-bottom:18px; text-align:center; color:var(--muted); font-size:14px; letter-spacing:4px; }
+        #players-list { display:grid; gap:8px; }
+        .player-row { display:grid; grid-template-columns:1fr auto; gap:10px; padding:10px; border-left:3px solid var(--cyan); background:#0d0721; font-size:12px; }
+        .player-role { color:var(--amber); font-size:10px; text-align:right; }
+        .crew-note { margin-top:11px; color:var(--muted); font-size:11px; line-height:1.4; }
+        .chat-box { display:grid; grid-template-rows:170px auto; border:1px solid #4b3266; background:#060312; }
+        #chat-log { overflow:auto; padding:10px; }
+        .chat-line { margin-bottom:7px; color:var(--muted); font-size:11px; line-height:1.35; }
+        .chat-line b { color:var(--cyan); }
+        .chat-compose { display:grid; grid-template-columns:1fr auto; border-top:1px solid #4b3266; }
+        #chat-input { border:0; min-height:40px; }
+        #chat-send { border-width:0 0 0 1px; min-height:40px; }
+        .lobby-actions { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:12px; }
+        .result-stat { display:grid; grid-template-columns:1fr auto; padding:11px 3px; border-bottom:1px solid #3c2851; color:var(--muted); }
+        .result-stat b { color:#fff; }
+        #touch-controls { position:absolute; inset:0; z-index:17; display:none; pointer-events:none; }
+        #touch-controls.visible { display:none; }
+        .touch-cluster { position:absolute; bottom:22px; pointer-events:auto; }
+        #touch-joystick {
+            left:25px; width:164px; height:164px; border:3px solid rgba(255,255,255,.58); border-radius:50%;
+            background:radial-gradient(circle at 50% 50%,rgba(22,242,221,.13) 0 21%,rgba(17,6,42,.72) 22% 66%,rgba(141,75,255,.22) 67% 100%);
+            box-shadow:inset 0 0 30px rgba(22,242,221,.12),0 5px 0 rgba(0,0,0,.38); touch-action:none;
+        }
+        #touch-joystick::before,#touch-joystick::after { content:""; position:absolute; left:50%; top:50%; background:rgba(255,255,255,.15); transform:translate(-50%,-50%); pointer-events:none; }
+        #touch-joystick::before { width:2px; height:78%; }
+        #touch-joystick::after { width:78%; height:2px; }
+        #joystick-knob {
+            position:absolute; left:50%; top:50%; width:72px; height:72px; margin:-36px 0 0 -36px; border:3px solid var(--cyan); border-radius:50%;
+            background:radial-gradient(circle at 38% 32%,rgba(255,255,255,.34),rgba(22,242,221,.23) 28%,rgba(15,7,39,.96) 72%);
+            box-shadow:0 4px 0 rgba(0,0,0,.42),0 0 18px rgba(22,242,221,.26); transform:translate(0,0); pointer-events:none;
+        }
+        #touch-joystick.active { border-color:var(--cyan); box-shadow:inset 0 0 35px rgba(22,242,221,.22),0 0 24px rgba(22,242,221,.28); }
+        #touch-joystick.active #joystick-knob { box-shadow:0 2px 0 rgba(0,0,0,.42),0 0 26px rgba(22,242,221,.52); }
+        #touch-action-wrap { right:84px; }
+        .touch-btn { border:2px solid rgba(255,255,255,.65); background:rgba(17,6,42,.7); color:#fff; font-size:26px; font-weight:bold; backdrop-filter:blur(3px); touch-action:none; }
+        #touch-action { width:118px; height:96px; border-color:var(--amber); color:var(--amber); font-size:15px; }
+        .touch-btn.active { background:rgba(22,242,221,.27); border-color:var(--cyan); }
+        .touch-btn:disabled { opacity:.45; filter:saturate(.25); }
+        #toast { position:absolute; z-index:100; left:50%; bottom:38px; transform:translate(-50%,20px); max-width:720px; padding:11px 18px; opacity:0; pointer-events:none; border:2px solid var(--magenta); background:#0a041d; transition:.2s; text-align:center; }
+        #toast.show { opacity:1; transform:translate(-50%,0); }
+        #asset-status { position:absolute; right:13px; top:10px; z-index:8; color:#706789; font-size:9px; letter-spacing:2px; }
+        @media (max-height:650px) {
+            .panel { padding:18px; }
+            h1 { font-size:58px; }
+            .brand { margin-bottom:12px; }
+            .identity { margin:10px 0 12px; }
+            .mode-card { min-height:150px; }
+        }
+        /*
+         * Phone landscape layout. On an iPhone 16e the 1280×720 stage scales
+         * to about .54, so these internal sizes produce 11–14pt type and
+         * roughly 44pt primary targets after scaling.
+         */
+        @media (pointer:coarse) and (max-width:900px), (pointer:coarse) and (max-height:500px) {
+            #overlay { padding:14px 38px; align-items:flex-start; }
+            .screen { width:min(1160px,100%); max-height:692px; }
+            .panel { padding:22px 24px; border-width:3px; }
+            .panel::before,.panel::after { height:9px; width:96px; }
+            .brand { margin-bottom:10px; }
+            .brand-kicker { font-size:21px; letter-spacing:4px; }
+            h1 { margin:2px 0; font-size:76px; }
+            .tagline { font-size:21px; letter-spacing:3px; }
+            h2 { font-size:38px; }
+            h3 { margin-bottom:10px; font-size:21px; letter-spacing:2px; }
+            .eyebrow { font-size:21px; letter-spacing:2px; }
+            .screen-head { gap:16px; margin-bottom:14px; }
+            .identity { gap:15px; margin:10px 0 12px; padding:8px 12px; }
+            .identity label { font-size:21px; letter-spacing:1px; }
+            .identity span { display:none; }
+            .input,select { min-height:82px; padding:15px 17px; border-width:3px; font-size:22px; }
+            #nickname { max-width:390px; }
+            .mode-grid { gap:16px; }
+            .mode-card { min-height:220px; padding:20px 22px; border-width:3px; }
+            .mode-no { font-size:62px; }
+            .mode-title { font-size:30px; }
+            .mode-copy { max-width:470px; margin:11px 0; font-size:21px; line-height:1.3; }
+            .mode-cta { font-size:21px; letter-spacing:1px; }
+            .desktop-help { display:none; }
+            .mobile-help { display:block; margin-top:11px; font-size:21px; line-height:1.3; }
+            .subpanel { padding:15px 17px; border-width:2px; }
+            .form-grid,.lobby-grid { gap:14px; }
+            .field { gap:5px; margin-bottom:9px; }
+            .field label { font-size:21px; letter-spacing:1px; }
+            .inline-fields { gap:10px; }
+            .checkline { min-height:82px; gap:14px; margin:4px 0 9px; font-size:21px; }
+            .checkline input { width:44px; height:44px; }
+            .btn,.btn.small { min-height:82px; padding:13px 19px; border-width:3px; font-size:21px; }
+            .rules { gap:10px; margin:12px 0; }
+            .rule { padding:12px 14px; font-size:21px; line-height:1.3; }
+            .rule b { margin-bottom:4px; font-size:21px; }
+            #rooms { max-height:230px; }
+            .room-row { grid-template-columns:1.45fr .65fr .75fr auto; gap:9px; padding:12px; font-size:21px; }
+            .room-row small { font-size:21px; }
+            .empty { padding:20px; font-size:21px; }
+            .room-code { font-size:68px; letter-spacing:14px; }
+            .room-name { margin-bottom:12px; font-size:21px; letter-spacing:3px; }
+            #players-list { gap:7px; }
+            .player-row { padding:11px 13px; font-size:21px; }
+            .player-role { font-size:21px; }
+            .crew-note { margin-top:8px; font-size:21px; line-height:1.3; }
+            .chat-box { grid-template-rows:205px auto; }
+            #chat-log { padding:12px; }
+            .chat-line { margin-bottom:8px; font-size:21px; line-height:1.3; }
+            #chat-input,#chat-send { min-height:82px; }
+            .lobby-actions { gap:10px; margin-top:10px; }
+            .result-stat,#dialog-copy { font-size:21px; }
+            .hud-box { top:16px; min-width:260px; padding:11px 16px; border-width:3px; }
+            #hud-left { left:28px; }
+            #hud-right { right:28px; }
+            .hud-label { font-size:21px; letter-spacing:1px; }
+            .hud-value { font-size:29px; }
+            #mission-chip { top:16px; padding:11px 19px; border-width:3px; font-size:21px; letter-spacing:1px; }
+            #warning { top:110px; font-size:25px; letter-spacing:3px; }
+            #phase-message { font-size:72px; }
+            #phase-message small { font-size:21px; letter-spacing:3px; }
+            #crew-strip { left:94px; bottom:226px; max-width:470px; padding:10px 13px; font-size:21px; }
+            #fuel-shell { bottom:24px; width:350px; height:24px; border-width:3px; }
+            #fuel-label { bottom:56px; font-size:21px; letter-spacing:1px; }
+            #menu-button { top:108px; right:88px; bottom:auto; width:76px; height:76px; border-width:3px; font-size:32px; }
+            #touch-controls.visible { display:block; }
+            .touch-cluster { bottom:30px; }
+            #touch-joystick { left:90px; width:190px; height:190px; border-width:4px; }
+            #joystick-knob { width:88px; height:88px; margin:-44px 0 0 -44px; border-width:4px; }
+            #touch-action-wrap { right:104px; bottom:42px; }
+            .touch-btn { border-width:4px; border-radius:13px; font-size:36px; box-shadow:0 5px 0 rgba(0,0,0,.42); }
+            #touch-action { width:154px; height:132px; font-size:21px; line-height:1.2; }
+            .touch-btn.active { transform:translateY(4px); box-shadow:0 1px 0 rgba(0,0,0,.42),0 0 22px rgba(22,242,221,.4); }
+            #toast { bottom:230px; min-width:520px; padding:14px 20px; border-width:3px; font-size:21px; }
+            #asset-status { display:none; }
+        }
+    </style>
+</head>
+<body>
+<main id="stage" aria-label="Cosmic Ark Alpha Ro Rescue game">
+    <canvas id="game" width="1280" height="720"></canvas>
+    <div id="scanlines"></div>
+    <div id="asset-status">LOADING OBJ TELEMETRY…</div>
+
+    <section id="hud" aria-live="polite">
+        <div id="hud-left" class="hud-box"><div class="hud-label">MISSION SCORE</div><div class="hud-value"><span id="score">000000</span> · P<span id="planet">01</span></div></div>
+        <div id="hud-right" class="hud-box"><div class="hud-label">SECTOR TIMER</div><div class="hud-value"><span id="timer">00.0</span> · <span id="cargo">0/2</span></div></div>
+        <div id="mission-chip">SOLO // METEOR SHOWER</div>
+        <div id="warning">METEOR WARNING // RETURN TO ARK</div>
+        <div id="phase-message"></div>
+        <div id="crew-strip">CAPTAIN // ALL SYSTEMS</div>
+        <div id="fuel-label">ARK FUEL // 40 UNITS</div><div id="fuel-shell"><div id="fuel-bar"></div></div>
+    </section>
+    <button id="menu-button" aria-label="Mission menu">☰</button>
+
+    <section id="overlay">
+        <div id="main-screen" class="screen active">
+            <div class="panel">
+                <header class="brand"><div class="brand-kicker">IMAGIC ERA // REIMAGINED</div><h1>Cosmic Ark</h1><div class="tagline">ALPHA RO RESCUE // 2.5D</div></header>
+                <div class="identity"><label for="nickname">CREW CALLSIGN</label><input id="nickname" class="input" maxlength="18" value="Atlantean" autocomplete="nickname"><span>Custom OBJ fleet loaded directly by the game</span></div>
+                <div class="mode-grid">
+                    <button id="solo-button" class="mode-card"><span class="mode-no">01</span><span class="mode-title"><b>SOLO</b> MISSION</span><span class="mode-copy">Play every station: shoot the meteors, fly the shuttle, and rescue two creatures.</span><span class="mode-cta">PLAY SOLO →</span></button>
+                    <button id="online-button" class="mode-card"><span class="mode-no">02</span><span class="mode-title"><b>ONLINE</b> CREW</span><span class="mode-copy">Team up by room code. Split the Ark guns, shuttle, tractor beam, shields, and decoys.</span><span class="mode-cta">PLAY TOGETHER →</span></button>
+                </div>
+                <div class="footer-help desktop-help"><b>WASD / ARROWS</b> move or fire · <b>SPACE</b> beam / shield · <b>ESC</b> menu<br>Fan-made homage with original code and models; not affiliated with Imagic or Atari.</div>
+                <div class="footer-help mobile-help"><b>TOUCH READY</b> // Use the left joystick and action button during play.</div>
+            </div>
+        </div>
+
+        <div id="solo-screen" class="screen">
+            <div class="panel">
+                <div class="screen-head"><div><div class="eyebrow">ONE ATLANTEAN // EVERY STATION</div><h2>Solo Mission</h2></div><button class="btn ghost small" data-screen="main-screen">← BACK</button></div>
+                <div class="rules">
+                    <div class="rule"><b>1 // SHOOT</b>Push the joystick toward the meteor’s side. Each shot uses one fuel.</div>
+                    <div class="rule"><b>2 // RESCUE</b>Fly close above a creature. Hold <em>BEAM</em> until it reaches your shuttle.</div>
+                    <div class="rule"><b>3 // RETURN</b>Dock before the red warning ends. A complete pair earns <em>1000 points</em>.</div>
+                </div>
+                <div class="form-grid">
+                    <div class="field"><label for="solo-difficulty">MISSION VARIATION</label><select id="solo-difficulty"><option value="regular">REGULAR // Original rhythm</option><option value="advanced">ADVANCED // Faster threats</option><option value="shower">METEOR SHOWER // Defense endurance</option></select></div>
+                    <div class="subpanel"><h3>FUEL</h3><div class="crew-note">Start 40 · Shot −1 · Meteor +1 · Creature +10 · Ark hit −10. At zero, the next hit ends the mission.</div></div>
+                </div>
+                <button id="start-solo" class="btn pink block" style="margin-top:16px">LAUNCH THE COSMIC ARK</button>
+            </div>
+        </div>
+
+        <div id="online-screen" class="screen">
+            <div class="panel">
+                <div class="screen-head"><div><div class="eyebrow">PHP ROOM UPLINK</div><h2>Online Crew</h2></div><button class="btn ghost small" data-screen="main-screen">← BACK</button></div>
+                <div class="form-grid">
+                    <div class="subpanel"><h3>CREATE MISSION</h3><div class="field"><label for="room-name">ROOM NAME</label><input id="room-name" class="input" maxlength="28" value="Alpha Ro Rescue"></div><div class="inline-fields"><div class="field"><label for="max-players">CREW SIZE</label><select id="max-players"><option value="2">2 // Relay Duo</option><option value="3">3 // Ark Crew</option><option value="4">4 // Full Crew</option></select></div><div class="field"><label for="room-difficulty">DIFFICULTY</label><select id="room-difficulty"><option value="regular">REGULAR</option><option value="advanced">ADVANCED</option></select></div></div><label class="checkline"><input id="private-room" type="checkbox"> Private room (code only)</label><button id="create-room" class="btn pink block">CREATE UPLINK</button></div>
+                    <div class="subpanel"><h3>JOIN BY CODE</h3><div class="field"><label for="join-code">SIX CHARACTER CODE</label><input id="join-code" class="input" maxlength="6" placeholder="ARK260"></div><button id="join-room" class="btn block">JOIN CREW</button><div class="crew-note">Two players split guns, helm, and beam. Larger crews add relief fire, decoys, and shields.</div></div>
+                </div>
+                <div class="screen-head" style="margin:18px 0 10px"><div><div class="eyebrow">PUBLIC TRANSMISSIONS</div><h2 style="font-size:24px">OPEN ROOMS</h2></div><button id="refresh-rooms" class="btn ghost small">REFRESH</button></div>
+                <div id="rooms"><div class="empty">Scanning Alpha Ro…</div></div>
+            </div>
+        </div>
+
+        <div id="lobby-screen" class="screen">
+            <div class="panel">
+                <div class="eyebrow" style="text-align:center">ARK UPLINK CODE</div><div id="lobby-code" class="room-code">------</div><div id="lobby-name" class="room-name">ALPHA RO RESCUE</div>
+                <div class="lobby-grid">
+                    <div class="subpanel"><h3>CREW MANIFEST <span id="player-count"></span></h3><div id="players-list"></div><div id="role-note" class="crew-note"></div><div class="lobby-actions"><button id="start-online" class="btn yellow">LAUNCH</button><button id="leave-room" class="btn ghost">LEAVE</button></div></div>
+                    <div><h3>CREW TRANSMISSIONS</h3><div class="chat-box"><div id="chat-log"><div class="chat-line">Uplink ready.</div></div><form id="chat-form" class="chat-compose"><input id="chat-input" class="input" maxlength="140" placeholder="Message your crew…" autocomplete="off"><button id="chat-send" class="btn small">SEND</button></form></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="dialog-screen" class="screen">
+            <div class="panel" style="max-width:760px;margin:auto;text-align:center"><div id="dialog-eyebrow" class="eyebrow">MISSION CONTROL</div><h2 id="dialog-title" style="margin:7px 0 12px">PAUSED</h2><p id="dialog-copy" style="color:var(--muted);line-height:1.5;margin-bottom:16px">The Ark is holding position.</p><div id="result-stats" style="display:none;text-align:left;margin:14px 0"></div><div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap"><button id="resume" class="btn">RESUME</button><button id="restart" class="btn yellow">NEW MISSION</button><button id="quit" class="btn pink">EXIT TO MENU</button></div></div>
+        </div>
+    </section>
+
+    <div id="touch-controls">
+        <div id="touch-joystick" class="touch-cluster" role="application" aria-label="Movement and firing joystick"><div id="joystick-knob"></div></div>
+        <div id="touch-action-wrap" class="touch-cluster"><button id="touch-action" class="touch-btn" data-control="action" aria-label="Use tractor beam, shield, or decoy">BEAM<br>/ SHIELD</button></div>
+    </div>
+    <div id="toast"></div>
+</main>
+
+<script>
+(function () {
+    'use strict';
+
+    var API = './cosmicark.php';
+    var W = 1280, H = 720;
+    var canvas = document.getElementById('game');
+    var ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    var stage = document.getElementById('stage');
+    var overlay = document.getElementById('overlay');
+    var hud = document.getElementById('hud');
+    var touchControls = document.getElementById('touch-controls');
+    var menuButton = document.getElementById('menu-button');
+    var toastNode = document.getElementById('toast');
+    var mode = '';
+    var scene = 'menu';
+    var world = null;
+    var room = null;
+    var selfId = '';
+    var roomTimer = 0;
+    var inputTimer = 0;
+    var stateTimer = 0;
+    var pollBusy = false;
+    var inputBusy = false;
+    var stateBusy = false;
+    var toastTimer = 0;
+    var stableStageScale = 0;
+    var stablePortrait = false;
+    var lastFrame = performance.now();
+    var keys = {up:false,down:false,left:false,right:false,action:false,analog:false,axisX:0,axisY:0};
+    var models = {};
+    var materials = {};
+    var particles = [];
+    var audio = null;
+    var stars = [];
+
+    for (var starIndex = 0; starIndex < 190; starIndex++) {
+        stars.push({
+            x:(starIndex * 83.17) % W,
+            y:(starIndex * starIndex * 7.13 + 31) % 610,
+            s:starIndex % 13 === 0 ? 3 : (starIndex % 4 === 0 ? 2 : 1),
+            p:(starIndex * .37) % 6.28,
+            c:['#fff','#6de8ff','#ff80b9','#ffc941'][starIndex % 4]
+        });
+    }
+
+    function resizeStage() {
+        var viewportW = window.innerWidth, viewportH = window.innerHeight;
+        var portrait = viewportH > viewportW;
+        var availableW = portrait ? viewportH : viewportW;
+        var availableH = portrait ? viewportW : viewportH;
+        var scale = Math.min(availableW / W, availableH / H);
+        var activeTag = document.activeElement && document.activeElement.tagName || '';
+        var shortSide = Math.min(viewportW,viewportH), longSide = Math.max(viewportW,viewportH);
+        var keyboardOpen = /^(INPUT|TEXTAREA|SELECT)$/.test(activeTag) && (shortSide < 320 || longSide / Math.max(1,shortSide) < 1.65);
+        if (keyboardOpen && stableStageScale) {
+            scale = stableStageScale;
+            portrait = stablePortrait;
+        } else {
+            stableStageScale = scale;
+            stablePortrait = portrait;
+        }
+        stage.style.transform = 'translate(-50%, -50%)' + (portrait ? ' rotate(90deg)' : '') + ' scale(' + scale + ')';
+    }
+
+    function toast(message) {
+        clearTimeout(toastTimer);
+        toastNode.textContent = message;
+        toastNode.classList.add('show');
+        toastTimer = setTimeout(function () { toastNode.classList.remove('show'); }, 2800);
+    }
+
+    function showScreen(id) {
+        Array.prototype.forEach.call(document.querySelectorAll('.screen'), function (node) {
+            node.classList.toggle('active', node.id === id);
+        });
+        overlay.classList.remove('hidden');
+    }
+
+    function hideOverlay() { overlay.classList.add('hidden'); }
+
+    function showGameChrome(show) {
+        hud.classList.toggle('visible', show);
+        menuButton.classList.toggle('visible', show);
+        touchControls.classList.toggle('visible', show);
+    }
+
+    function escapeHtml(value) {
+        return String(value).replace(/[&<>'"]/g, function (char) {
+            return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char];
+        });
+    }
+
+    function callsign() {
+        var value = document.getElementById('nickname').value.trim().replace(/[^\w .!?#-]/g, '').slice(0,18);
+        return value || 'Atlantean';
+    }
+
+    async function netPost(data) {
+        var body = new URLSearchParams();
+        Object.keys(data).forEach(function (key) { body.set(key, String(data[key])); });
+        var response = await fetch(API, {method:'POST', body:body, credentials:'same-origin', cache:'no-store'});
+        var json = await response.json().catch(function () { return {ok:false,error:'Invalid uplink response.'}; });
+        if (!response.ok || !json.ok) throw new Error(json.error || 'The Alpha Ro uplink failed.');
+        return json;
+    }
+
+    async function netList() {
+        var response = await fetch(API + '?action=list&_=' + Date.now(), {credentials:'same-origin',cache:'no-store'});
+        var json = await response.json().catch(function () { return {ok:false,error:'Invalid uplink response.'}; });
+        if (!response.ok || !json.ok) throw new Error(json.error || 'The Alpha Ro uplink failed.');
+        return json;
+    }
+
+    function unlockAudio() {
+        if (!audio) {
+            var AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) audio = new AudioContext();
+        }
+        if (audio && audio.state === 'suspended') audio.resume().catch(function () {});
+    }
+
+    function tone(frequency, duration, type, volume, slide) {
+        if (!audio || audio.state !== 'running') return;
+        var oscillator = audio.createOscillator();
+        var gain = audio.createGain();
+        oscillator.type = type || 'square';
+        oscillator.frequency.setValueAtTime(frequency, audio.currentTime);
+        if (slide) oscillator.frequency.exponentialRampToValueAtTime(Math.max(30, slide), audio.currentTime + duration);
+        gain.gain.setValueAtTime(volume || .025, audio.currentTime);
+        gain.gain.exponentialRampToValueAtTime(.0001, audio.currentTime + duration);
+        oscillator.connect(gain); gain.connect(audio.destination);
+        oscillator.start(); oscillator.stop(audio.currentTime + duration);
+    }
+
+    function parseMtl(source) {
+        var current = '';
+        String(source).replace(/\r/g,'').split('\n').forEach(function (line) {
+            var parts = line.trim().split(/\s+/);
+            if (parts[0] === 'newmtl') current = parts[1] || '';
+            if (parts[0] === 'Kd' && current) {
+                materials[current] = parts.slice(1,4).map(function (n) { return Math.round(Number(n) * 255); });
+            }
+        });
+    }
+
+    function parseObj(source) {
+        var vertices = [], faces = [], material = 'ark_crimson';
+        String(source).replace(/\r/g,'').split('\n').forEach(function (line) {
+            var parts = line.trim().split(/\s+/);
+            if (parts[0] === 'v' && parts.length >= 4) vertices.push([Number(parts[1]),Number(parts[2]),Number(parts[3])]);
+            if (parts[0] === 'usemtl') material = parts[1] || material;
+            if (parts[0] === 'f' && parts.length >= 4) {
+                var indices = parts.slice(1).map(function (token) {
+                    var index = parseInt(token.split('/')[0],10);
+                    return index < 0 ? vertices.length + index : index - 1;
+                });
+                for (var i = 1; i < indices.length - 1; i++) faces.push({v:[indices[0],indices[i],indices[i+1]],m:material});
+            }
+        });
+        return {vertices:vertices,faces:faces};
+    }
+
+    function fallbackModel() {
+        return parseObj('v -1 -1 -1\nv 1 -1 -1\nv 1 1 -1\nv -1 1 -1\nv -1 -1 1\nv 1 -1 1\nv 1 1 1\nv -1 1 1\nf 1 2 3 4\nf 5 8 7 6\nf 1 5 6 2\nf 4 3 7 8\nf 1 4 8 5\nf 2 6 7 3');
+    }
+
+    async function loadModels() {
+        var files = ['ark','shuttle','meteor','beastie','turret'];
+        try {
+            var materialResponse = await fetch('./cosmicark-assets.mtl', {credentials:'same-origin'});
+            if (!materialResponse.ok) throw new Error('MTL');
+            parseMtl(await materialResponse.text());
+            var responses = await Promise.all(files.map(function (name) { return fetch('./' + name + '.obj', {credentials:'same-origin'}); }));
+            await Promise.all(responses.map(async function (response, index) {
+                if (!response.ok) throw new Error(files[index]);
+                models[files[index]] = parseObj(await response.text());
+            }));
+            document.getElementById('asset-status').textContent = '5 OBJ ASSETS // ONLINE';
+        } catch (error) {
+            files.forEach(function (name) { if (!models[name]) models[name] = fallbackModel(); });
+            materials.ark_crimson = [230,36,52];
+            document.getElementById('asset-status').textContent = 'OBJ FALLBACK ACTIVE';
+        }
+    }
+
+    function rotatePoint(point, rx, ry, rz) {
+        var x = point[0], y = point[1], z = point[2];
+        var cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry), cz = Math.cos(rz), sz = Math.sin(rz);
+        var y1 = y * cx - z * sx, z1 = y * sx + z * cx;
+        var x2 = x * cy + z1 * sy, z2 = -x * sy + z1 * cy;
+        return [x2 * cz - y1 * sz, x2 * sz + y1 * cz, z2];
+    }
+
+    function shadedColor(rgb, shade, tint) {
+        rgb = rgb || [210,45,70];
+        var t = tint || null;
+        if (t) rgb = [rgb[0]*(1-t.a)+t.r*t.a,rgb[1]*(1-t.a)+t.g*t.a,rgb[2]*(1-t.a)+t.b*t.a];
+        return 'rgb(' + rgb.map(function (value) { return Math.max(0,Math.min(255,Math.round(value*shade))); }).join(',') + ')';
+    }
+
+    function renderMesh(name, x, y, scale, rx, ry, rz, options) {
+        var model = models[name];
+        if (!model) return;
+        options = options || {};
+        var transformed = model.vertices.map(function (vertex) { return rotatePoint(vertex,rx||0,ry||0,rz||0); });
+        var faces = model.faces.map(function (face) {
+            var a=transformed[face.v[0]], b=transformed[face.v[1]], c=transformed[face.v[2]];
+            var ux=b[0]-a[0], uy=b[1]-a[1], vx=c[0]-a[0], vy=c[1]-a[1];
+            var normal=ux*vy-uy*vx;
+            return {p:[a,b,c],depth:(a[2]+b[2]+c[2])/3,mat:face.m,light:.52+Math.min(.48,Math.abs(normal)*.12)};
+        }).sort(function (a,b) { return a.depth-b.depth; });
+        ctx.save();
+        if (options.alpha !== undefined) ctx.globalAlpha = options.alpha;
+        faces.forEach(function (face) {
+            ctx.beginPath();
+            face.p.forEach(function (point,index) {
+                var perspective = 1 + point[2] * .025;
+                var px=x+point[0]*scale*perspective, py=y-point[1]*scale*perspective;
+                if (index) ctx.lineTo(px,py); else ctx.moveTo(px,py);
+            });
+            ctx.closePath();
+            ctx.fillStyle=shadedColor(materials[face.mat],face.light,options.tint);
+            ctx.fill();
+            ctx.strokeStyle='rgba(3,1,10,.55)'; ctx.lineWidth=Math.max(1,scale*.035); ctx.stroke();
+        });
+        ctx.restore();
+    }
+
+    function rngFactory(seed) {
+        var value=Math.max(1,Math.abs(seed||1)%2147483647);
+        return function () { value=(value*48271)%2147483647; return value/2147483647; };
+    }
+
+    function makeBeasties(level, seed) {
+        var random=rngFactory(seed+level*991);
+        return [330+random()*160,790+random()*160].map(function (x,index) {
+            return {x:x,y:565,vx:(index?1:-1)*(24+random()*18),rescued:false,aboard:false,progress:0,variant:(level+index)%4};
+        });
+    }
+
+    function newWorld(difficulty, seed, showerOnly) {
+        return {
+            phase:'transition',nextPhase:'shower',transition:2.8,phaseTime:0,totalTime:0,
+            level:1,score:0,fuel:40,maxFuel:40,difficulty:difficulty,seed:seed,showerOnly:!!showerOnly,
+            message:'ALPHA RO',submessage:'METEOR FIELD DETECTED',meteors:[],lasers:[],turretShots:[],
+            spawnWait:.35,invuln:0,shield:0,shieldCooldown:0,gunCooldowns:[0,0,0,0],decoyCooldowns:[0,0],
+            showerDuration:difficulty==='advanced'?22:19,rescueDuration:difficulty==='advanced'?22:27,
+            shuttle:{x:640,y:130,vx:0,vy:0,beam:false,shield:0},beasties:makeBeasties(1,seed),
+            turretClock:0,turretWait:1.4,rescuedTotal:0,meteorsDestroyed:0,impacts:0,perfectPlanets:0,version:1
+        };
+    }
+
+    function currentInputs() {
+        if (mode==='solo' || !room) return [Object.assign({},keys)];
+        return room.players.map(function (player) {
+            return player.id===selfId ? Object.assign({},keys) : Object.assign({},player.input||{});
+        });
+    }
+
+    function burst(x,y,color,count) {
+        for (var i=0;i<(count||10);i++) {
+            var angle=Math.random()*Math.PI*2, speed=40+Math.random()*150;
+            particles.push({x:x,y:y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:.4+Math.random()*.5,max:.9,color:color||'#ff9d18'});
+        }
+    }
+
+    function beginTransition(next,message,submessage) {
+        world.phase='transition'; world.nextPhase=next; world.transition=2.35;
+        world.message=message; world.submessage=submessage;
+        world.meteors=[]; world.lasers=[]; world.turretShots=[];
+    }
+
+    function startShower() {
+        world.phase='shower'; world.phaseTime=0; world.spawnWait=.2; world.invuln=.8; world.shield=0;
+        world.meteors=[]; world.lasers=[]; world.turretShots=[];
+        world.showerDuration=Math.max(10,(world.difficulty==='advanced'?22:19)-world.level*.55);
+        tone(95,.3,'sawtooth',.04,180);
+    }
+
+    function startRescue() {
+        world.phase='rescue'; world.phaseTime=0; world.turretWait=1.1; world.turretClock=0;
+        world.turretShots=[]; world.shuttle.x=640; world.shuttle.y=130; world.shuttle.vx=0; world.shuttle.vy=0; world.shuttle.beam=false;
+        world.rescueDuration=Math.max(13,(world.difficulty==='advanced'?22:27)-world.level*.7);
+        tone(360,.24,'square',.035,720);
+    }
+
+    function loseMission(reason) {
+        world.phase='gameover'; world.message='ARK LOST'; world.submessage=reason||'FUEL RESERVES EXHAUSTED';
+        tone(180,.8,'sawtooth',.07,38);
+        setTimeout(showResults,850);
+    }
+
+    function spawnMeteor() {
+        var edge=Math.floor(Math.random()*4), margin=48, x,y;
+        // The 2600 game is a four-lane reflex test: ordinary meteors approach
+        // the Ark on its exact compass axes, matching the four joystick shots.
+        if (edge===0) {x=640;y=-margin;}
+        if (edge===1) {x=W+margin;y=340;}
+        if (edge===2) {x=640;y=H+margin;}
+        if (edge===3) {x=-margin;y=340;}
+        var dx=640-x,dy=340-y,length=Math.hypot(dx,dy)||1;
+        var speed=(world.difficulty==='advanced'?96:78)+world.level*5+Math.random()*25;
+        world.meteors.push({x:x,y:y,vx:dx/length*speed,vy:dy/length*speed,size:18+Math.random()*18,wavy:Math.random()<.13,life:1,spin:Math.random()*6.28});
+    }
+
+    function fireDirection(direction, cooldownIndex) {
+        if (world.fuel<=0 || world.gunCooldowns[cooldownIndex]>0) return;
+        var vectors={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}, vector=vectors[direction];
+        world.lasers.push({x:640+vector[0]*68,y:340+vector[1]*55,vx:vector[0]*690,vy:vector[1]*690,life:1.1});
+        world.fuel=Math.max(0,world.fuel-1); world.gunCooldowns[cooldownIndex]=cooldownIndex===2?.34:.22;
+        tone(290,.055,'square',.025,150);
+    }
+
+    function activateShield() {
+        if (world.shieldCooldown>0) return;
+        world.shield=.6; world.shieldCooldown=2.8;
+        tone(170,.25,'sine',.04,620);
+    }
+
+    function hitArk(meteor) {
+        if (world.invuln>0 || world.shield>0) {
+            burst(meteor.x,meteor.y,'#16f2dd',12); return;
+        }
+        if (world.fuel<=0) { loseMission('THE NEXT METEOR FOUND AN EMPTY ARK'); return; }
+        world.fuel=Math.max(0,world.fuel-10); world.invuln=1.2; world.impacts++;
+        burst(640,340,'#ff355d',24); tone(90,.4,'sawtooth',.06,42);
+    }
+
+    function updateShower(dt,inputs) {
+        world.phaseTime+=dt; world.invuln=Math.max(0,world.invuln-dt); world.shield=Math.max(0,world.shield-dt); world.shieldCooldown=Math.max(0,world.shieldCooldown-dt);
+        for (var g=0;g<world.gunCooldowns.length;g++) world.gunCooldowns[g]=Math.max(0,world.gunCooldowns[g]-dt);
+        if (mode==='solo') {
+            ['up','down','left','right'].forEach(function (direction) { if (inputs[0][direction]) fireDirection(direction,0); });
+            if (inputs[0].action) activateShield();
+        } else {
+            var vertical=inputs[0]||{}, horizontal=inputs[1]||{}, relief=inputs[2]||{}, shield=inputs[3]||{};
+            if (vertical.up) fireDirection('up',0); if (vertical.down) fireDirection('down',0);
+            if (horizontal.left) fireDirection('left',1); if (horizontal.right) fireDirection('right',1);
+            if (relief.up) fireDirection('up',2); if (relief.down) fireDirection('down',2); if (relief.left) fireDirection('left',2); if (relief.right) fireDirection('right',2);
+            if (shield.action) activateShield();
+        }
+        world.spawnWait-=dt;
+        if (world.spawnWait<=0) {
+            spawnMeteor();
+            world.spawnWait=Math.max(.27,1.02-world.level*.045-(world.difficulty==='advanced'?.18:0))*(.72+Math.random()*.6);
+        }
+        world.lasers.forEach(function (laser) { laser.x+=laser.vx*dt; laser.y+=laser.vy*dt; laser.life-=dt; });
+        world.lasers=world.lasers.filter(function (laser) { return laser.life>0 && laser.x>-70 && laser.x<W+70 && laser.y>-70 && laser.y<H+70; });
+        world.meteors.forEach(function (meteor) {
+            meteor.spin+=dt*(meteor.wavy?5:2); meteor.x+=meteor.vx*dt; meteor.y+=meteor.vy*dt;
+            if (meteor.wavy) { meteor.x+=Math.sin(world.totalTime*9+meteor.spin)*28*dt; meteor.y+=Math.cos(world.totalTime*8+meteor.spin)*20*dt; }
+            for (var i=world.lasers.length-1;i>=0 && meteor.life>0;i--) {
+                var laser=world.lasers[i];
+                if (Math.hypot(laser.x-meteor.x,laser.y-meteor.y)<meteor.size+8) {
+                    world.lasers.splice(i,1); meteor.life=0; world.score+=meteor.wavy?30:10;
+                    world.fuel=Math.min(world.maxFuel,world.fuel+1); world.meteorsDestroyed++;
+                    burst(meteor.x,meteor.y,meteor.wavy?'#ff2e88':'#ff8b18',16); tone(meteor.wavy?520:420,.09,'square',.025,110);
+                }
+            }
+            if (meteor.life>0 && Math.hypot(meteor.x-640,meteor.y-340)<meteor.size+64) { meteor.life=0; hitArk(meteor); }
+        });
+        world.meteors=world.meteors.filter(function (meteor) { return meteor.life>0; });
+        if (world.phase!=='shower') return;
+        if (world.phaseTime>=world.showerDuration) {
+            if (world.showerOnly) {
+                world.level++; beginTransition('shower','SECTOR CLEAR','NEXT METEOR WAVE');
+            } else beginTransition('rescue','PLANET '+String(world.level).padStart(2,'0'),'TWO LIFE SIGNS DETECTED');
+        }
+    }
+
+    function releaseAboardCreature() {
+        for (var i=world.beasties.length-1;i>=0;i--) {
+            if (world.beasties[i].aboard && !world.beasties[i].rescued) {
+                world.beasties[i].aboard=false; world.beasties[i].x=330+Math.random()*620; world.beasties[i].progress=0; return true;
+            }
+        }
+        return false;
+    }
+
+    function dockShuttle() {
+        var delivered=0;
+        world.beasties.forEach(function (beastie) {
+            if (beastie.aboard && !beastie.rescued) { beastie.rescued=true; beastie.aboard=false; delivered++; }
+        });
+        if (delivered) { world.rescuedTotal+=delivered; tone(680,.14,'square',.035,980); }
+        if (world.beasties.every(function (beastie) { return beastie.rescued; })) {
+            world.score+=1000; world.fuel=world.maxFuel; world.perfectPlanets++;
+            world.level++; world.beasties=makeBeasties(world.level,world.seed);
+            beginTransition('shower','SPECIES SECURED','ARK FUEL RESTORED');
+            return true;
+        }
+        return false;
+    }
+
+    function activateDecoy(sideIndex) {
+        if (world.decoyCooldowns[sideIndex]>0) return;
+        world.decoyCooldowns[sideIndex]=2.2;
+        var fromLeft=sideIndex===0;
+        var best=-1,bestDistance=1e9;
+        world.turretShots.forEach(function (shot,index) {
+            var valid=fromLeft?shot.vx>0:shot.vx<0;
+            var distance=Math.hypot(shot.x-world.shuttle.x,shot.y-world.shuttle.y);
+            if (valid && distance<bestDistance) { best=index; bestDistance=distance; }
+        });
+        if (best>=0) {
+            var shot=world.turretShots[best]; burst(shot.x,shot.y,fromLeft?'#16f2dd':'#ffb20c',10); world.turretShots.splice(best,1); world.score+=30;
+        }
+        tone(fromLeft?240:310,.16,'sine',.03,700);
+    }
+
+    function updateRescue(dt,inputs) {
+        world.phaseTime+=dt; world.turretClock+=dt;
+        for (var i=0;i<2;i++) world.decoyCooldowns[i]=Math.max(0,world.decoyCooldowns[i]-dt);
+        var moveInput,beamInput;
+        if (mode==='solo') { moveInput=inputs[0]; beamInput=inputs[0].action; }
+        else {
+            moveInput=inputs[0]||{}; beamInput=!!(inputs[1]&&inputs[1].action);
+            if (inputs[2]&&inputs[2].action) activateDecoy(0);
+            if (inputs[3]&&inputs[3].action) activateDecoy(1);
+        }
+        var moveX=moveInput.analog?Math.max(-1,Math.min(1,Number(moveInput.axisX)||0)):((moveInput.right?1:0)-(moveInput.left?1:0));
+        var moveY=moveInput.analog?Math.max(-1,Math.min(1,Number(moveInput.axisY)||0)):((moveInput.down?1:0)-(moveInput.up?1:0));
+        var ax=moveX*610;
+        var ay=moveY*610;
+        world.shuttle.vx=(world.shuttle.vx+ax*dt)*Math.pow(.055,dt);
+        world.shuttle.vy=(world.shuttle.vy+ay*dt)*Math.pow(.055,dt);
+        world.shuttle.x=Math.max(115,Math.min(1165,world.shuttle.x+world.shuttle.vx*dt));
+        world.shuttle.y=Math.max(122,Math.min(525,world.shuttle.y+world.shuttle.vy*dt));
+        world.shuttle.beam=beamInput && world.shuttle.y>235;
+        world.beasties.forEach(function (beastie) {
+            if (beastie.rescued || beastie.aboard) return;
+            beastie.x+=beastie.vx*dt;
+            if (beastie.x<185 || beastie.x>1095) { beastie.vx*=-1; beastie.x=Math.max(185,Math.min(1095,beastie.x)); }
+            var aligned=Math.abs(beastie.x-world.shuttle.x)<68;
+            if (world.shuttle.beam && aligned) {
+                beastie.progress+=dt*(1.05+(535-world.shuttle.y)/420);
+                beastie.x+=(world.shuttle.x-beastie.x)*dt*2.6;
+                if (beastie.progress>=1.05) {
+                    beastie.aboard=true; beastie.progress=0; world.fuel=Math.min(world.maxFuel,world.fuel+10);
+                    burst(beastie.x,world.shuttle.y,'#a8ff19',16); tone(430,.18,'square',.04,860);
+                }
+            } else beastie.progress=Math.max(0,beastie.progress-dt*.65);
+        });
+        if (world.shuttle.y<150 && dockShuttle()) return;
+        world.turretWait-=dt;
+        if (world.turretWait<=0) {
+            var fromLeft=Math.random()<.5, turretY=335+Math.sin(world.turretClock*(fromLeft?1.45:1.18)+(fromLeft?0:2.3))*125;
+            var dx=world.shuttle.x-(fromLeft?78:1202),dy=world.shuttle.y-turretY,length=Math.hypot(dx,dy)||1;
+            var speed=(world.difficulty==='advanced'?335:285)+world.level*7;
+            world.turretShots.push({x:fromLeft?88:1192,y:turretY,vx:dx/length*speed,vy:dy/length*speed,life:4,side:fromLeft?0:1});
+            world.turretWait=Math.max(.48,1.35-world.level*.04-(world.difficulty==='advanced'?.2:0))*(.75+Math.random()*.45);
+            tone(150,.08,'square',.018,90);
+        }
+        world.turretShots.forEach(function (shot) { shot.x+=shot.vx*dt; shot.y+=shot.vy*dt; shot.life-=dt; });
+        for (var s=world.turretShots.length-1;s>=0;s--) {
+            var shot=world.turretShots[s];
+            if (Math.hypot(shot.x-world.shuttle.x,shot.y-world.shuttle.y)<29) {
+                world.turretShots.splice(s,1); burst(world.shuttle.x,world.shuttle.y,'#ff2e88',19);
+                if (world.fuel<=0) { loseMission('PLANETARY DEFENSES FOUND AN EMPTY ARK'); return; }
+                world.fuel=Math.max(0,world.fuel-5); world.impacts++; releaseAboardCreature();
+                world.shuttle.x=640; world.shuttle.y=130; world.shuttle.vx=0; world.shuttle.vy=0;
+                tone(110,.38,'sawtooth',.055,48); break;
+            }
+        }
+        world.turretShots=world.turretShots.filter(function (shot) { return shot.life>0 && shot.x>-40 && shot.x<W+40; });
+        if (world.phase!=='rescue') return;
+        if (world.phaseTime>=world.rescueDuration) {
+            if (world.shuttle.y<170) dockShuttle();
+            if (world.phase==='rescue') {
+                if (world.shuttle.y>=170) { releaseAboardCreature(); world.fuel=Math.max(0,world.fuel-5); }
+                world.shuttle.x=640; world.shuttle.y=130;
+                beginTransition('shower','METEOR WARNING','INCOMPLETE RESCUE // DEFEND THE ARK');
+            }
+        }
+    }
+
+    function updateWorld(dt) {
+        if (!world || world.phase==='gameover') return;
+        world.totalTime+=dt; world.version=(world.version||0)+1;
+        var inputs=currentInputs();
+        if (world.phase==='transition') {
+            world.transition-=dt;
+            if (world.transition<=0) { if (world.nextPhase==='shower') startShower(); else startRescue(); }
+        } else if (world.phase==='shower') updateShower(dt,inputs);
+        else if (world.phase==='rescue') updateRescue(dt,inputs);
+        particles.forEach(function (particle) { particle.x+=particle.vx*dt; particle.y+=particle.vy*dt; particle.vx*=Math.pow(.08,dt); particle.vy*=Math.pow(.08,dt); particle.life-=dt; });
+        particles=particles.filter(function (particle) { return particle.life>0; });
+    }
+
+    function drawStars(now, rescue) {
+        var gradient=ctx.createLinearGradient(0,0,0,H);
+        gradient.addColorStop(0,rescue?'#090326':'#03010b'); gradient.addColorStop(.62,rescue?'#17033a':'#09031d'); gradient.addColorStop(1,rescue?'#4a1248':'#150628');
+        ctx.fillStyle=gradient; ctx.fillRect(0,0,W,H);
+        stars.forEach(function (star,index) {
+            var flicker=.42+.58*Math.abs(Math.sin(now*.0017+star.p));
+            var drift=rescue?0:Math.sin(now*.0004+index)*1.5;
+            ctx.globalAlpha=flicker; ctx.fillStyle=star.c; ctx.fillRect(Math.round(star.x+drift),Math.round(star.y),star.s*(index%17===0?3:1),star.s);
+        });
+        ctx.globalAlpha=1;
+        if (!rescue) {
+            ctx.globalAlpha=.11;
+            for (var y=94;y<590;y+=93) { ctx.fillStyle=y%2?'#16f2dd':'#ff2e88'; ctx.fillRect(0,y,W,2); }
+            ctx.globalAlpha=1;
+        }
+    }
+
+    function drawParticles() {
+        particles.forEach(function (particle) {
+            ctx.globalAlpha=Math.max(0,particle.life/particle.max); ctx.fillStyle=particle.color;
+            ctx.fillRect(particle.x-3,particle.y-3,6,6);
+        });
+        ctx.globalAlpha=1;
+    }
+
+    function drawShower(now) {
+        drawStars(now,false);
+        ctx.save(); ctx.translate(640,340); ctx.globalAlpha=.16;
+        for (var ring=0;ring<4;ring++) { ctx.strokeStyle=ring%2?'#ff2e88':'#ffb20c'; ctx.lineWidth=2; ctx.strokeRect(-100-ring*18,-72-ring*14,200+ring*36,144+ring*28); }
+        ctx.restore();
+        world.lasers.forEach(function (laser) {
+            ctx.strokeStyle='#fff49a';ctx.lineWidth=7;ctx.shadowColor='#ff9b12';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(laser.x,laser.y);ctx.lineTo(laser.x-laser.vx*.045,laser.y-laser.vy*.045);ctx.stroke();ctx.shadowBlur=0;
+        });
+        world.meteors.forEach(function (meteor) {
+            renderMesh('meteor',meteor.x,meteor.y,meteor.size*.78,meteor.spin*.7,meteor.spin,meteor.spin*.32,{alpha:.97});
+            if (meteor.wavy) { ctx.strokeStyle='rgba(255,46,136,.7)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(meteor.x,meteor.y,meteor.size+10,0,Math.PI*2);ctx.stroke(); }
+        });
+        var arkAlpha=world.invuln>0 && Math.floor(world.invuln*12)%2===0?.18:1;
+        ctx.save();ctx.globalAlpha=arkAlpha;
+        renderMesh('ark',640,353,31,-.62,Math.sin(now*.0004)*.12,0,{alpha:arkAlpha});
+        ctx.restore();
+        if (world.shield>0) {
+            ctx.strokeStyle='rgba(22,242,221,'+(world.shield/.6)+')';ctx.lineWidth=7;ctx.shadowColor='#16f2dd';ctx.shadowBlur=24;
+            ctx.beginPath();ctx.ellipse(640,340,128,92,0,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;
+        }
+        drawParticles();
+    }
+
+    function terrainHeight(x,now) { return 557+Math.sin(x*.012+world.level)*10+Math.sin(x*.031+now*.00015)*5; }
+
+    function drawRescue(now) {
+        drawStars(now,true);
+        var horizon=540;
+        var skyGlow=ctx.createLinearGradient(0,360,0,610); skyGlow.addColorStop(0,'rgba(255,45,128,0)');skyGlow.addColorStop(1,'rgba(255,74,16,.27)');ctx.fillStyle=skyGlow;ctx.fillRect(0,330,W,280);
+        ctx.fillStyle='#244d28';ctx.beginPath();ctx.moveTo(0,H);
+        for (var x=0;x<=W;x+=32) ctx.lineTo(x,terrainHeight(x,now));
+        ctx.lineTo(W,H);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='#62cf3a';ctx.lineWidth=4;ctx.beginPath();
+        for (var gx=0;gx<=W;gx+=32) { var gy=terrainHeight(gx,now); if (!gx) ctx.moveTo(gx,gy); else ctx.lineTo(gx,gy); }
+        ctx.stroke();
+        ctx.globalAlpha=.22;ctx.strokeStyle='#a8ff19';ctx.lineWidth=1;
+        for (var line=0;line<5;line++) { var yy=horizon+line*38;ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(W,yy);ctx.stroke(); }
+        for (var ray=80;ray<W;ray+=120) {ctx.beginPath();ctx.moveTo(640,horizon);ctx.lineTo(ray,H);ctx.stroke();}
+        ctx.globalAlpha=1;
+        renderMesh('ark',640,100,17,-.6,0,0,{});
+        ctx.fillStyle='rgba(22,242,221,.35)';ctx.fillRect(603,116,74,3);
+        var leftY=335+Math.sin(world.turretClock*1.45)*125;
+        var rightY=335+Math.sin(world.turretClock*1.18+2.3)*125;
+        renderMesh('turret',78,leftY,25,-.22,Math.PI/2,.08,{});
+        renderMesh('turret',1202,rightY,25,-.22,-Math.PI/2,-.08,{});
+        if (world.decoyCooldowns[0]>1.75) {ctx.strokeStyle='#16f2dd';ctx.lineWidth=5;ctx.beginPath();ctx.arc(135,leftY,78+(2.2-world.decoyCooldowns[0])*180,-1.2,1.2);ctx.stroke();}
+        if (world.decoyCooldowns[1]>1.75) {ctx.strokeStyle='#ffb20c';ctx.lineWidth=5;ctx.beginPath();ctx.arc(1145,rightY,78+(2.2-world.decoyCooldowns[1])*180,Math.PI-1.2,Math.PI+1.2);ctx.stroke();}
+        world.turretShots.forEach(function (shot) {
+            ctx.strokeStyle=shot.side===0?'#ff56aa':'#ffb20c';ctx.lineWidth=6;ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=14;
+            ctx.beginPath();ctx.moveTo(shot.x,shot.y);ctx.lineTo(shot.x-shot.vx*.055,shot.y-shot.vy*.055);ctx.stroke();ctx.shadowBlur=0;
+        });
+        if (world.shuttle.beam) {
+            var beam=ctx.createLinearGradient(world.shuttle.x,world.shuttle.y,world.shuttle.x,590);beam.addColorStop(0,'rgba(22,242,221,.12)');beam.addColorStop(1,'rgba(22,242,221,.48)');
+            ctx.fillStyle=beam;ctx.beginPath();ctx.moveTo(world.shuttle.x-18,world.shuttle.y+12);ctx.lineTo(world.shuttle.x-78,586);ctx.lineTo(world.shuttle.x+78,586);ctx.lineTo(world.shuttle.x+18,world.shuttle.y+12);ctx.closePath();ctx.fill();
+            ctx.strokeStyle='rgba(180,255,249,.55)';ctx.lineWidth=2;ctx.stroke();
+        }
+        world.beasties.forEach(function (beastie,index) {
+            if (beastie.rescued || beastie.aboard) return;
+            var beamY=beastie.y-beastie.progress*(beastie.y-world.shuttle.y-30);
+            var colors=[[168,255,25],[255,196,21],[48,230,255],[255,74,166]],color=colors[beastie.variant%colors.length];
+            renderMesh('beastie',beastie.x,beamY,22,-.3,Math.sin(now*.004+index)*.4,Math.sin(now*.009+index)*.08,{tint:{r:color[0],g:color[1],b:color[2],a:.52}});
+            if (beastie.progress>0) {ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.strokeRect(beastie.x-30,beamY+28,60,5);ctx.fillStyle='#16f2dd';ctx.fillRect(beastie.x-29,beamY+29,58*Math.min(1,beastie.progress/1.05),3);}
+        });
+        var aboard=world.beasties.filter(function (beastie) { return beastie.aboard; }).length;
+        renderMesh('shuttle',world.shuttle.x,world.shuttle.y,24,-.5,Math.sin(now*.003)*.1,world.shuttle.vx*.0007,{tint:aboard?{r:168,g:255,b:25,a:.16}:null});
+        if (aboard) {ctx.fillStyle='#a8ff19';ctx.font='bold 21px Courier New';ctx.textAlign='center';ctx.fillText('CARGO '+aboard+'/2',world.shuttle.x,world.shuttle.y-38);}
+        drawParticles();
+    }
+
+    function drawAttract(now) {
+        drawStars(now,false);
+        ctx.globalAlpha=.16;ctx.fillStyle='#ff2e88';ctx.beginPath();ctx.arc(640,340,215+Math.sin(now*.001)*12,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+        renderMesh('ark',640,365,43,-.58,now*.00035,Math.sin(now*.0007)*.06,{});
+    }
+
+    function drawCountdown(now) {
+        drawStars(now,false);renderMesh('ark',640,370,39,-.62,now*.00035,0,{});
+        var remaining=room?Math.max(0,Math.ceil((room.startAt-Date.now())/1000)):0;
+        ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='bold 88px Courier New';ctx.shadowColor='#ff2e88';ctx.shadowBlur=22;ctx.fillText(remaining||'SYNC',640,250);ctx.shadowBlur=0;
+        ctx.fillStyle='#16f2dd';ctx.font='bold 22px Courier New';ctx.fillText('CREW UPLINK LOCKED // PREPARE STATIONS',640,300);
+    }
+
+    function updateHUD() {
+        if (!world) return;
+        document.getElementById('score').textContent=String(Math.floor(world.score)).padStart(6,'0');
+        document.getElementById('planet').textContent=String(world.level).padStart(2,'0');
+        var remaining=world.phase==='shower'?Math.max(0,world.showerDuration-world.phaseTime):world.phase==='rescue'?Math.max(0,world.rescueDuration-world.phaseTime):world.transition;
+        document.getElementById('timer').textContent=Math.max(0,remaining).toFixed(1);
+        var cargo=world.beasties?world.beasties.filter(function (b) {return b.rescued||b.aboard;}).length:0;
+        document.getElementById('cargo').textContent=cargo+'/2';
+        document.getElementById('fuel-bar').style.width=(world.fuel/world.maxFuel*100)+'%';
+        document.getElementById('fuel-label').textContent='ARK FUEL // '+Math.round(world.fuel)+' UNITS';
+        var phaseName=world.phase==='rescue'?'SHUTTLE RESCUE':world.phase==='shower'?'METEOR SHOWER':world.nextPhase==='rescue'?'PLANET APPROACH':'DEEP SPACE TRANSIT';
+        document.getElementById('mission-chip').textContent=(mode==='online'&&room?'ROOM '+room.code:'SOLO')+' // '+phaseName;
+        var warning=world.phase==='rescue' && world.rescueDuration-world.phaseTime<=5;
+        document.getElementById('warning').style.display=warning?'block':'none';
+        var message=document.getElementById('phase-message');
+        message.innerHTML=world.phase==='transition'?escapeHtml(world.message)+'<small>'+escapeHtml(world.submessage)+'</small>':'';
+        var crew='CAPTAIN // ALL SYSTEMS';
+        if (mode==='online'&&room) {
+            var index=room.players.findIndex(function (player) { return player.id===selfId; });
+            var me=room.players[index];
+            if (me) crew=(me.nickname||'CREW').toUpperCase()+' // '+String((me.role||{})[world.phase]||(world.phase==='rescue'?'MISSION SUPPORT':'ARK CREW')).toUpperCase();
+        }
+        document.getElementById('crew-strip').textContent=crew;
+        var actionButton=document.getElementById('touch-action');
+        var actionLabel='Use tractor beam', actionInactive=false;
+        if (world.phase==='shower') {
+            var showerRole=room?room.players.findIndex(function(p){return p.id===selfId;}):-1;
+            if (mode==='solo'||showerRole===3) { actionButton.innerHTML='SHIELD'; actionLabel='Activate Ark shield'; }
+            else { actionButton.innerHTML='USE<br>JOYSTICK'; actionLabel='Use joystick for your gun sector'; actionInactive=true; }
+        } else if (mode==='online'&&room) {
+            var roleIndex=room.players.findIndex(function(p){return p.id===selfId;});
+            if (roleIndex===1) { actionButton.innerHTML='TRACTOR<br>BEAM'; actionLabel='Use tractor beam'; }
+            else if (roleIndex>=2) { actionButton.innerHTML='DECOY'; actionLabel='Launch defense decoy'; }
+            else { actionButton.innerHTML='USE<br>JOYSTICK'; actionLabel='Use joystick to fly the shuttle'; actionInactive=true; }
+        } else actionButton.innerHTML='TRACTOR<br>BEAM';
+        actionButton.disabled=actionInactive;
+        actionButton.setAttribute('aria-label',actionLabel);
+        if (actionInactive) keys.action=false;
+    }
+
+    function render(now) {
+        ctx.clearRect(0,0,W,H);
+        if ((mode==='online'&&scene==='playing'&&!world)||(room&&room.status==='playing'&&Date.now()<room.startAt)) drawCountdown(now);
+        else if (world&&(scene==='playing'||scene==='paused'||scene==='results')) {
+            var visualPhase=world.phase==='transition'?world.nextPhase:world.phase;
+            if (visualPhase==='rescue') drawRescue(now); else drawShower(now);
+            updateHUD();
+        } else drawAttract(now);
+    }
+
+    function isHost() {
+        if (!room) return false;
+        var me=room.players.find(function (player) { return player.id===selfId; });
+        return !!(me&&me.host);
+    }
+
+    function missionStatsHtml() {
+        if (!world) return '';
+        return '<div class="result-stat"><b>PLANETS REACHED</b><span>'+world.level+'</span></div>'+
+            '<div class="result-stat"><b>SPECIMENS SECURED</b><span>'+world.rescuedTotal+'</span></div>'+
+            '<div class="result-stat"><b>METEORS DESTROYED</b><span>'+world.meteorsDestroyed+'</span></div>'+
+            '<div class="result-stat"><b>FINAL SCORE</b><span>'+String(Math.floor(world.score)).padStart(6,'0')+'</span></div>';
+    }
+
+    function showResults() {
+        if (!world||scene==='results') return;
+        scene='results'; showGameChrome(false);
+        document.getElementById('dialog-eyebrow').textContent='ALPHA RO MISSION REPORT';
+        document.getElementById('dialog-title').textContent=world.message||'ARK LOST';
+        document.getElementById('dialog-copy').textContent=world.submessage||'The mission has ended.';
+        var stats=document.getElementById('result-stats');stats.innerHTML=missionStatsHtml();stats.style.display='block';
+        document.getElementById('resume').style.display='none';
+        document.getElementById('restart').style.display=mode==='solo'||isHost()?'':'none';
+        showScreen('dialog-screen');
+    }
+
+    function openMissionMenu() {
+        if (scene!=='playing') return;
+        if (mode==='solo') scene='paused';
+        document.getElementById('dialog-eyebrow').textContent=mode==='online'?'LIVE CREW MISSION':'MISSION CONTROL';
+        document.getElementById('dialog-title').textContent=mode==='online'?'MISSION LIVE':'PAUSED';
+        document.getElementById('dialog-copy').textContent=mode==='online'?'Your crew remains active while this panel is open.':'The Ark is holding position.';
+        document.getElementById('result-stats').style.display='none';
+        document.getElementById('resume').style.display='';document.getElementById('restart').style.display='none';
+        showScreen('dialog-screen');
+    }
+
+    function startSolo() {
+        unlockAudio();mode='solo';room=null;selfId='';scene='playing';particles=[];
+        var difficulty=document.getElementById('solo-difficulty').value;
+        world=newWorld(difficulty==='advanced'?'advanced':'regular',Math.floor(Math.random()*2147483000)+1,difficulty==='shower');
+        hideOverlay();showGameChrome(true);
+        try { localStorage.setItem('cosmicArkCallsign',callsign()); } catch (ignore) {}
+    }
+
+    function returnMain() {
+        var oldRoom=room;
+        room=null;selfId='';world=null;mode='';scene='menu';particles=[];
+        clearInterval(roomTimer);clearInterval(inputTimer);clearInterval(stateTimer);roomTimer=inputTimer=stateTimer=0;
+        showGameChrome(false);showScreen('main-screen');
+        if (oldRoom) netPost({action:'leave',code:oldRoom.code}).catch(function(){});
+    }
+
+    function renderLobby() {
+        if (!room) return;
+        document.getElementById('lobby-code').textContent=room.code;
+        document.getElementById('lobby-name').textContent=room.name.toUpperCase()+' // '+room.difficulty.toUpperCase();
+        document.getElementById('player-count').textContent=room.players.length+' / '+room.maxPlayers;
+        var list=document.getElementById('players-list');list.innerHTML='';
+        room.players.forEach(function (player,index) {
+            var row=document.createElement('div');row.className='player-row';
+            row.innerHTML='<span>'+escapeHtml(player.nickname)+(player.host?' ★':'')+'</span><span class="player-role">'+escapeHtml(player.role.shower)+'<br>'+escapeHtml(player.role.rescue)+'</span>';
+            list.appendChild(row);
+        });
+        document.getElementById('role-note').textContent=room.players.length<=2?'RELAY DUO // vertical and horizontal guns share the shower; helm and tractor beam split the rescue.':'ARK CREW // added stations provide relief fire, missile decoys, and the visible Ark shield.';
+        var launch=document.getElementById('start-online');launch.style.display=isHost()?'':'none';launch.disabled=room.players.length<2;launch.textContent=room.players.length<2?'WAITING FOR CREW':'LAUNCH MISSION';
+        var log=document.getElementById('chat-log');var nearBottom=log.scrollHeight-log.scrollTop-log.clientHeight<35;log.innerHTML='';
+        if (!room.chat.length) log.innerHTML='<div class="chat-line">Uplink ready. Share the room code with your crew.</div>';
+        room.chat.forEach(function (message) {var line=document.createElement('div');line.className='chat-line';line.innerHTML='<b>'+escapeHtml(message.nickname)+':</b> '+escapeHtml(message.message);log.appendChild(line);});
+        if (nearBottom) log.scrollTop=log.scrollHeight;
+    }
+
+    function applyRoom(next) {
+        var wasStart=room&&room.startAt;var nextSelf=next.selfId;var me=next.players.find(function(p){return p.id===nextSelf;});
+        var host=!!(me&&me.host);selfId=nextSelf;room=next;
+        if (!host&&next.world) world=next.world;
+        else if (!world&&next.world) world=next.world;
+        if (next.status==='lobby') {
+            scene='lobby';showGameChrome(false);renderLobby();showScreen('lobby-screen');
+        } else if (next.status==='playing') {
+            if (wasStart!==next.startAt) {world=next.world||null;particles=[];}
+            scene='playing';hideOverlay();showGameChrome(true);
+        } else if (next.status==='finished') {
+            if (next.world) world=next.world;
+            if (world&&world.phase==='gameover') showResults();
+        }
+    }
+
+    function startRoomLoops() {
+        clearInterval(roomTimer);clearInterval(inputTimer);clearInterval(stateTimer);
+        roomTimer=setInterval(pollRoom,430);inputTimer=setInterval(sendInput,115);stateTimer=setInterval(sendState,130);
+    }
+
+    async function pollRoom() {
+        if (!room||pollBusy||mode!=='online') return;pollBusy=true;
+        try {var response=await netPost({action:'poll',code:room.code});applyRoom(response.room);}
+        catch(error){if(!/network|failed/i.test(error.message)){toast(error.message);returnMain();}}
+        finally{pollBusy=false;}
+    }
+
+    async function sendInput() {
+        if (!room||inputBusy||mode!=='online'||scene!=='playing') return;inputBusy=true;
+        try {
+            var response=await netPost({action:'input',code:room.code,up:keys.up?1:0,down:keys.down?1:0,left:keys.left?1:0,right:keys.right?1:0,action:keys.action?1:0,analog:keys.analog?1:0,axisX:keys.axisX.toFixed(3),axisY:keys.axisY.toFixed(3)});
+            applyRoom(response.room);
+        } catch(ignore) {} finally {inputBusy=false;}
+    }
+
+    async function sendState() {
+        if (!room||!world||stateBusy||mode!=='online'||scene!=='playing'||!isHost()||Date.now()<room.startAt) return;stateBusy=true;
+        try {var response=await netPost({action:'state',code:room.code,world:JSON.stringify(world)});applyRoom(response.room);}
+        catch(ignore) {} finally {stateBusy=false;}
+    }
+
+    async function refreshRooms() {
+        var list=document.getElementById('rooms');list.innerHTML='<div class="empty">Scanning Alpha Ro…</div>';
+        try {
+            var response=await netList();list.innerHTML='';
+            if (!response.rooms.length) {list.innerHTML='<div class="empty">No public missions. Open the first uplink.</div>';return;}
+            response.rooms.forEach(function (listed) {
+                var row=document.createElement('div');row.className='room-row';
+                row.innerHTML='<span>'+escapeHtml(listed.name)+'<br><small style="color:#746b8f">'+escapeHtml(listed.code)+' · '+escapeHtml(listed.difficulty)+'</small></span><span class="status">'+escapeHtml(listed.status)+'</span><span>'+listed.players+' / '+listed.maxPlayers+' CREW</span><button class="btn small">JOIN</button>';
+                row.querySelector('button').disabled=listed.status!=='lobby';row.querySelector('button').addEventListener('click',function(){joinRoom(listed.code);});list.appendChild(row);
+            });
+        } catch(error) {list.innerHTML='<div class="empty">'+escapeHtml(error.message)+'</div>';}
+    }
+
+    async function createRoom() {
+        var button=document.getElementById('create-room');button.disabled=true;button.textContent='OPENING UPLINK…';
+        try {
+            var response=await netPost({action:'create',name:document.getElementById('room-name').value,nickname:callsign(),maxPlayers:document.getElementById('max-players').value,difficulty:document.getElementById('room-difficulty').value,private:document.getElementById('private-room').checked?1:0});
+            mode='online';world=null;applyRoom(response.room);startRoomLoops();
+        } catch(error){toast(error.message);} finally {button.disabled=false;button.textContent='CREATE UPLINK';}
+    }
+
+    async function joinRoom(codeOverride) {
+        var code=String(codeOverride||document.getElementById('join-code').value).trim().toUpperCase();
+        if (code.length!==6){toast('Enter a six character Ark code.');return;}
+        try {var response=await netPost({action:'join',code:code,nickname:callsign()});mode='online';world=null;applyRoom(response.room);startRoomLoops();}
+        catch(error){toast(error.message);}
+    }
+
+    async function startOnlineMission() {
+        if(!room)return;unlockAudio();
+        try {var response=await netPost({action:'start',code:room.code});world=null;applyRoom(response.room);}
+        catch(error){toast(error.message);}
+    }
+
+    async function sendChat(event) {
+        event.preventDefault();if(!room)return;var input=document.getElementById('chat-input'),message=input.value.trim();if(!message)return;
+        input.value='';try{var response=await netPost({action:'chat',code:room.code,message:message});applyRoom(response.room);}catch(error){toast(error.message);}
+    }
+
+    function restartMission() {
+        if (mode==='solo') {startSolo();return;}
+        if (room&&isHost()) startOnlineMission();
+    }
+
+    function gameLoop(now) {
+        var dt=Math.min(.04,Math.max(0,(now-lastFrame)/1000));lastFrame=now;
+        if (scene==='playing') {
+            if (mode==='online'&&room&&room.status==='playing'&&Date.now()>=room.startAt&&!world&&isHost()) world=newWorld(room.difficulty,room.seed,false);
+            if (world&&(mode==='solo'||(mode==='online'&&isHost()))&&Date.now()>=(room?room.startAt:0)) updateWorld(dt);
+        }
+        render(now);requestAnimationFrame(gameLoop);
+    }
+
+    var keyMap={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',Space:'action',ShiftLeft:'action',ShiftRight:'action'};
+    window.addEventListener('keydown',function(event){
+        if(keyMap[event.code]){keys[keyMap[event.code]]=true;event.preventDefault();unlockAudio();}
+        if(event.code==='Escape'){event.preventDefault();if(scene==='playing')openMissionMenu();else if(scene==='paused'){scene='playing';hideOverlay();}}
+    });
+    var joystick=document.getElementById('touch-joystick');
+    var joystickKnob=document.getElementById('joystick-knob');
+    var joystickPointer=null;
+    function resetJoystick(){
+        joystickPointer=null;keys.analog=false;keys.axisX=0;keys.axisY=0;keys.up=keys.down=keys.left=keys.right=false;
+        if(joystick){joystick.classList.remove('active');joystickKnob.style.transform='translate(0px,0px)';}
+    }
+    function updateJoystick(event){
+        var rect=joystick.getBoundingClientRect();
+        var screenX=event.clientX-(rect.left+rect.width/2),screenY=event.clientY-(rect.top+rect.height/2);
+        var scale=Math.max(.001,stableStageScale||1);
+        var localX=stablePortrait?screenY/scale:screenX/scale;
+        var localY=stablePortrait?-screenX/scale:screenY/scale;
+        var radius=74,magnitude=Math.hypot(localX,localY),clamped=Math.min(radius,magnitude);
+        var nx=magnitude?localX/magnitude:0,ny=magnitude?localY/magnitude:0;
+        var dead=radius*.14;
+        var strength=clamped<=dead?0:(clamped-dead)/(radius-dead);
+        keys.axisX=nx*strength;keys.axisY=ny*strength;keys.analog=true;
+        // Meteor defense remains a four-lane reflex game: the dominant joystick
+        // axis chooses exactly one cannon lane instead of firing diagonally.
+        keys.up=keys.down=keys.left=keys.right=false;
+        if(strength>.18){
+            if(Math.abs(keys.axisX)>Math.abs(keys.axisY)) keys[keys.axisX<0?'left':'right']=true;
+            else keys[keys.axisY<0?'up':'down']=true;
+        }
+        joystickKnob.style.transform='translate('+(nx*clamped)+'px,'+(ny*clamped)+'px)';
+    }
+    window.addEventListener('keyup',function(event){if(keyMap[event.code]){keys[keyMap[event.code]]=false;event.preventDefault();}});
+    window.addEventListener('blur',function(){keys.action=false;resetJoystick();});
+    window.addEventListener('resize',resizeStage);window.addEventListener('orientationchange',resizeStage);
+    document.addEventListener('contextmenu',function(event){if(event.target.closest('.touch-btn')||event.target.closest('#touch-joystick'))event.preventDefault();});
+    document.addEventListener('pointerdown',unlockAudio,{passive:true});
+    joystick.addEventListener('pointerdown',function(event){event.preventDefault();joystickPointer=event.pointerId;joystick.classList.add('active');try{joystick.setPointerCapture(event.pointerId);}catch(ignore){}updateJoystick(event);});
+    joystick.addEventListener('pointermove',function(event){if(event.pointerId!==joystickPointer)return;event.preventDefault();updateJoystick(event);});
+    function endJoystick(event){if(joystickPointer!==null&&event.pointerId!==joystickPointer)return;event.preventDefault();resetJoystick();}
+    joystick.addEventListener('pointerup',endJoystick);joystick.addEventListener('pointercancel',endJoystick);joystick.addEventListener('lostpointercapture',endJoystick);
+    Array.prototype.forEach.call(document.querySelectorAll('.touch-btn'),function(button){
+        var control=button.getAttribute('data-control');
+        function down(event){event.preventDefault();keys[control]=true;button.classList.add('active');try{button.setPointerCapture(event.pointerId);}catch(ignore){}}
+        function up(event){event.preventDefault();keys[control]=false;button.classList.remove('active');}
+        button.addEventListener('pointerdown',down);button.addEventListener('pointerup',up);button.addEventListener('pointercancel',up);button.addEventListener('lostpointercapture',up);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-screen]'),function(button){button.addEventListener('click',function(){showScreen(button.getAttribute('data-screen'));});});
+    document.getElementById('solo-button').addEventListener('click',function(){showScreen('solo-screen');});
+    document.getElementById('online-button').addEventListener('click',function(){showScreen('online-screen');refreshRooms();});
+    document.getElementById('start-solo').addEventListener('click',startSolo);
+    document.getElementById('create-room').addEventListener('click',createRoom);
+    document.getElementById('join-room').addEventListener('click',function(){joinRoom();});
+    document.getElementById('refresh-rooms').addEventListener('click',refreshRooms);
+    document.getElementById('start-online').addEventListener('click',startOnlineMission);
+    document.getElementById('leave-room').addEventListener('click',returnMain);
+    document.getElementById('chat-form').addEventListener('submit',sendChat);
+    menuButton.addEventListener('click',openMissionMenu);
+    document.getElementById('resume').addEventListener('click',function(){hideOverlay();if(scene==='paused')scene='playing';});
+    document.getElementById('restart').addEventListener('click',restartMission);
+    document.getElementById('quit').addEventListener('click',returnMain);
+    document.getElementById('join-code').addEventListener('input',function(){this.value=this.value.toUpperCase().replace(/[^A-Z2-9]/g,'');});
+    window.addEventListener('pagehide',function(){if(room)fetch(API,{method:'POST',body:new URLSearchParams({action:'leave',code:room.code}),credentials:'same-origin',keepalive:true}).catch(function(){});});
+
+    try {var savedName=localStorage.getItem('cosmicArkCallsign');if(savedName)document.getElementById('nickname').value=savedName;}catch(ignore){}
+    resizeStage();loadModels();requestAnimationFrame(gameLoop);
+})();
+</script>
+</body>
+</html>
